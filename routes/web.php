@@ -35,6 +35,9 @@ Route::middleware(['auth'])->group(function () {
         )
         ->name('two-factor.show');
 
+    // POSレジデータ集計
+    Volt::route('dashboard/pos-data-aggregation', 'pos-data-aggregation.index')->name('pos-data-aggregation.index');
+
     // 予約管理
     Volt::route('dashboard/reservations', 'reservations.index')->name('reservations.index');
     Volt::route('dashboard/reservations/list', 'reservations.list')->name('reservations.list');
