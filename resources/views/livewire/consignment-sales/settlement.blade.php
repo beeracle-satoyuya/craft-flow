@@ -8,18 +8,19 @@ use function Livewire\Volt\computed;
 // データベースから委託販売データを取得して集計
 $products = computed(function () {
     // 最新のデータを取得（削除されていないもの）
-    $sales = ConsignmentSale::query()
-        ->orderBy('created_at', 'desc')
-        ->get();
+    $sales = ConsignmentSale::query()->orderBy('created_at', 'desc')->get();
 
     // 商品名ごとに集計
-    $grouped = $sales->groupBy('product_name')->map(function (Collection $items) {
-        return [
-            'product_name' => $items->first()->product_name,
-            'total_quantity' => $items->sum('quantity'),
-            'total_amount' => $items->sum('amount'),
-        ];
-    })->values();
+    $grouped = $sales
+        ->groupBy('product_name')
+        ->map(function (Collection $items) {
+            return [
+                'product_name' => $items->first()->product_name,
+                'total_quantity' => $items->sum('quantity'),
+                'total_amount' => $items->sum('amount'),
+            ];
+        })
+        ->values();
 
     return $grouped;
 });
@@ -32,6 +33,11 @@ $totalAmount = computed(function () {
 // 戻るボタンの処理
 $back = function () {
     return $this->redirect(route('consignment-sales.index'), navigate: true);
+};
+
+// Excel出力処理（ルートにリダイレクト）
+$export = function () {
+    return $this->redirect(route('consignment-sales.settlement.export'), navigate: false);
 };
 
 ?>
@@ -111,9 +117,18 @@ $back = function () {
             </flux:card>
         </div>
 
-        <!-- 戻るボタン -->
+        <!-- アクションボタン -->
         <div class="max-w-3xl mx-auto">
-            <div class="flex justify-end">
+            <div class="flex justify-between gap-4">
+                <flux:button variant="primary" wire:click="export" wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="export">
+                        <flux:icon.arrow-down-tray variant="micro" class="mr-2" />
+                        Excel出力
+                    </span>
+                    <span wire:loading wire:target="export">
+                        出力中...
+                    </span>
+                </flux:button>
                 <flux:button variant="ghost" wire:click="back">
                     <flux:icon.arrow-left variant="micro" class="mr-2" />
                     委託販売請求書発行画面に戻る
@@ -122,4 +137,3 @@ $back = function () {
         </div>
     </div>
 </div>
-
