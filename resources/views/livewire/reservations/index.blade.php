@@ -47,7 +47,7 @@
             </a>
 
             <!-- 3. 予約カレンダー（左下） -->
-            <a href="#" class="block group">
+            <a href="{{ route('reservations.calendar') }}" wire:navigate class="block group">
                 <div class="h-full p-8 bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border-2 border-zinc-200 dark:border-zinc-700 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-xl transition-all duration-200">
                     <div class="flex flex-col items-center text-center">
                         <div class="w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -59,13 +59,13 @@
                         <p class="text-zinc-600 dark:text-zinc-400">
                             カレンダー形式で<br>予約を確認
                         </p>
-                        <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span>
                     </div>
                 </div>
             </a>
 
             <!-- 4. 予約統計（右下） -->
-            <a href="#" class="block group">
+
+            <a href="{{ route('reservations.statistics') }}" wire:navigate class="block group">
                 <div class="h-full p-8 bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border-2 border-zinc-200 dark:border-zinc-700 hover:border-orange-500 dark:hover:border-orange-500 hover:shadow-xl transition-all duration-200">
                     <div class="flex flex-col items-center text-center">
                         <div class="w-20 h-20 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -77,7 +77,6 @@
                         <p class="text-zinc-600 dark:text-zinc-400">
                             予約状況の<br>統計・分析
                         </p>
-                        <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span>
                     </div>
                 </div>
             </a>

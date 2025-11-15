@@ -38,6 +38,8 @@ Route::middleware(['auth'])->group(function () {
     // 予約管理
     Volt::route('dashboard/reservations', 'reservations.index')->name('reservations.index');
     Volt::route('dashboard/reservations/list', 'reservations.list')->name('reservations.list');
+    Volt::route('dashboard/reservations/calendar', 'reservations.calendar')->name('reservations.calendar');
+    Volt::route('dashboard/reservations/statistics', 'reservations.statistics')->name('reservations.statistics');
     Volt::route('dashboard/reservations/create', 'reservations.create')->name('reservations.create');
     Volt::route('dashboard/reservations/{reservation}', 'reservations.show')->name('reservations.show');
     Volt::route('dashboard/reservations/{reservation}/edit', 'reservations.edit')->name('reservations.edit');

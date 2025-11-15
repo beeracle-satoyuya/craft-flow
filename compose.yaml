@@ -24,6 +24,7 @@ services:
             - sail
         depends_on:
             - mariadb
+            - mailpit
     mariadb:
         image: 'mariadb:11'
         ports:
@@ -48,6 +49,13 @@ services:
                 - '--innodb_initialized'
             retries: 3
             timeout: 5s
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+        networks:
+            - sail
 networks:
     sail:
         driver: bridge

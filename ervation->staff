@@ -1,0 +1,19 @@
+[90m= [39m[34;4mApp\Models\Workshop[39;24m {#6544
+    [34mprogram_id[39m: [35m2[39m,
+    [34mworkshop_category_id[39m: [35m1[39m,
+    [34mprogram_name[39m: "[32m藍染めストール体験[39m",
+    [34mdescription[39m: "[32m大判のストールを藍染めします。自分だけの模様を作れます。[39m",
+    [34mduration_minutes[39m: [35m120[39m,
+    [34mmax_capacity[39m: [35m6[39m,
+    [34mprice_per_person[39m: [35m5500[39m,
+    [34mis_active[39m: [35m1[39m,
+    [34mcreated_at[39m: "[32m2025-11-15 01:17:12[39m",
+    [34mupdated_at[39m: "[32m2025-11-15 01:17:12[39m",
+    [34mcategory[39m: [34;4mApp\Models\WorkshopCategory[39;24m {#6962
+      [34mid[39m: [35m1[39m,
+      [34mname[39m: "[32m藍染め体験[39m",
+      [34mcreated_at[39m: "[32m2025-11-15 01:17:12[39m",
+      [34mupdated_at[39m: "[32m2025-11-15 01:17:12[39m",
+    },
+  }
+
