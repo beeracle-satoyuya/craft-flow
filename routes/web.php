@@ -50,4 +50,8 @@ Route::middleware(['auth'])->group(function () {
 
     // プログラムカテゴリ管理
     Volt::route('dashboard/workshop-categories', 'workshop-categories.index')->name('workshop-categories.index');
+
+    // 委託販売請求書発行
+    Volt::route('dashboard/consignment-sales', 'consignment-sales.index')->name('consignment-sales.index');
+    Volt::route('dashboard/consignment-sales/settlement', 'consignment-sales.settlement')->name('consignment-sales.settlement');
 });
