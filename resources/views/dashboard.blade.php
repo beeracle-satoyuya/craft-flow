@@ -30,7 +30,7 @@
                         <p class="text-zinc-600 dark:text-zinc-400">
                             銀行振込データを<br>全銀フォーマットに変換
                         </p>
-                        <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span>
+                        {{-- <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span> --}}
                     </div>
                 </div>
             </a>
@@ -52,7 +52,7 @@
                         <p class="text-zinc-600 dark:text-zinc-400">
                             レジの売上データを<br>集計・分析
                         </p>
-                        <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span>
+                        {{-- <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span> --}}
                     </div>
                 </div>
             </a>
@@ -71,9 +71,9 @@
                                     d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                             </svg>
                         </div>
-                        <h3 class="text-2xl font-bold text-zinc-900 dark:text-white mb-2">委託販売請求書発行</h3>
+                        <h3 class="text-2xl font-bold text-zinc-900 dark:text-white mb-2">委託販売精算書発行</h3>
                         <p class="text-zinc-600 dark:text-zinc-400">
-                            委託販売の請求書を<br>作成・発行
+                            委託販売の精算書を<br>作成・発行
                         </p>
                     </div>
                 </div>
