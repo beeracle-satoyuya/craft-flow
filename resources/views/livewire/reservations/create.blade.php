@@ -3,12 +3,15 @@
 use function Livewire\Volt\{state, rules, mount};
 use App\Models\Workshop;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Rules\NoDoubleBooking;
+use App\Jobs\SendReservationConfirmationEmail;
 use Livewire\Attributes\Validate;
 
 // フォーム状態
 state([
     'program_id' => '',
+    'staff_id' => fn() => auth()->id(),
     'customer_name' => '',
     'customer_email' => '',
     'customer_phone' => '',
@@ -21,6 +24,7 @@ state([
     'options' => '',
     'cancellation_reason' => '',
     'workshops' => fn() => Workshop::with('category')->where('is_active', true)->get(),
+    'users' => fn() => User::orderBy('name')->get(),
 ]);
 
 // 予約を保存
@@ -31,6 +35,7 @@ $save = function () {
     // バリデーションルール（動的にダブルブッキングチェックを追加）
     $this->validate([
         'program_id' => 'required|exists:workshops,program_id',
+        'staff_id' => 'required|exists:users,id',
         'customer_name' => 'required|string|max:255',
         'customer_email' => 'required|email|max:255',
         'customer_phone' => 'required|string|max:20',
@@ -55,7 +60,7 @@ $save = function () {
 
     $reservation = Reservation::create([
         'program_id' => $this->program_id,
-        'staff_id' => auth()->id(),
+        'staff_id' => $this->staff_id,
         'customer_name' => $this->customer_name,
         'customer_email' => $this->customer_email,
         'customer_phone' => $this->customer_phone,
@@ -68,6 +73,11 @@ $save = function () {
         'cancellation_reason' => $this->cancellation_reason,
     ]);
 
+    // ステータスが「確定」の場合、予約確認メールを送信
+    if ($reservation->status === 'confirmed') {
+        SendReservationConfirmationEmail::dispatch($reservation);
+    }
+
     session()->flash('success', '予約を登録しました。');
     return $this->redirect(route('reservations.show', $reservation), navigate: true);
 };
@@ -76,7 +86,14 @@ $save = function () {
 
 <div>
     <flux:header container class="bg-white border-b">
-        <flux:heading size="xl" class="mb-0">新規予約登録</flux:heading>
+        <div class="flex items-center gap-4">
+            <a href="{{ route('reservations.index') }}" wire:navigate class="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-zinc-700 dark:text-zinc-300">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+                </svg>
+            </a>
+            <flux:heading size="xl" class="mb-0">新規予約登録</flux:heading>
+        </div>
     </flux:header>
 
     <flux:main container>
@@ -99,6 +116,17 @@ $save = function () {
                             @endforeach
                         </flux:select>
                         <flux:error name="program_id" />
+                    </flux:field>
+
+                    <!-- 登録スタッフ選択 -->
+                    <flux:field>
+                        <flux:label>登録スタッフ <span class="text-red-500">*</span></flux:label>
+                        <flux:select wire:model="staff_id" required>
+                            @foreach ($users as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="staff_id" />
                     </flux:field>
 
                     <!-- 予約日時 -->

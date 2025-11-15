@@ -29,8 +29,13 @@ with(fn() => [
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- 新規予約ボタン（目立つ位置） -->
-        <div class="mb-6">
+        <!-- 戻るボタンと新規予約ボタン -->
+        <div class="mb-6 flex items-center gap-4">
+            <a href="{{ route('reservations.index') }}" wire:navigate class="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-zinc-700 dark:text-zinc-300">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+                </svg>
+            </a>
             <flux:button variant="primary" href="{{ route('reservations.create') }}" wire:navigate size="lg" class="w-full sm:w-auto">
                 <flux:icon.plus variant="micro" class="mr-2" />
                 新しい予約を登録する

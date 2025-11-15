@@ -13,9 +13,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('workshops', function (Blueprint $table) {
-            $table->id();
+            $table->id('program_id'); // 最初からprogram_idとして作成
             $table->foreignId('workshop_category_id')->constrained('workshop_categories')->onDelete('cascade'); // カテゴリへの外部キー
-            $table->string('name'); // 体験プログラム名
+            $table->string('program_name'); // 最初からprogram_nameとして作成
             $table->text('description')->nullable(); // 説明
             $table->integer('duration_minutes'); // 所用時間（分単位）
             $table->integer('max_capacity'); // 最大受入人数
