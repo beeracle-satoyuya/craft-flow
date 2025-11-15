@@ -3,12 +3,15 @@
 use function Livewire\Volt\{state, rules, mount};
 use App\Models\Workshop;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Rules\NoDoubleBooking;
+use App\Jobs\SendReservationConfirmationEmail;
 
 // フォーム状態
 state([
     'reservation',
     'program_id' => '',
+    'staff_id' => '',
     'customer_name' => '',
     'customer_email' => '',
     'customer_phone' => '',
@@ -21,6 +24,7 @@ state([
     'options' => '',
     'cancellation_reason' => '',
     'workshops' => fn() => Workshop::with('category')->where('is_active', true)->get(),
+    'users' => fn() => User::orderBy('name')->get(),
 ]);
 
 // 初期化
@@ -32,6 +36,7 @@ mount(function (Reservation $reservation) {
     
     // フォームデータをセット
     $this->program_id = $reservation->program_id;
+    $this->staff_id = $reservation->staff_id;
     $this->customer_name = $reservation->customer_name;
     $this->customer_email = $reservation->customer_email;
     $this->customer_phone = $reservation->customer_phone;
@@ -50,9 +55,13 @@ $update = function () {
     // 日時を結合
     $reservationDatetime = $this->reservation_date . ' ' . $this->reservation_time;
     
+    // 更新前のステータスを保存
+    $wasConfirmed = $this->reservation->status === 'confirmed';
+    
     // バリデーションルール（動的にダブルブッキングチェックを追加、自分自身は除外）
     $this->validate([
         'program_id' => 'required|exists:workshops,program_id',
+        'staff_id' => 'required|exists:users,id',
         'customer_name' => 'required|string|max:255',
         'customer_email' => 'required|email|max:255',
         'customer_phone' => 'required|string|max:20',
@@ -78,6 +87,7 @@ $update = function () {
 
     $this->reservation->update([
         'program_id' => $this->program_id,
+        'staff_id' => $this->staff_id,
         'customer_name' => $this->customer_name,
         'customer_email' => $this->customer_email,
         'customer_phone' => $this->customer_phone,
@@ -89,6 +99,12 @@ $update = function () {
         'options' => $this->options ? json_decode($this->options, true) : null,
         'cancellation_reason' => $this->cancellation_reason,
     ]);
+
+    // ステータスが「確定」に変更された場合、予約確認メールを送信
+    $isNowConfirmed = $this->status === 'confirmed';
+    if (!$wasConfirmed && $isNowConfirmed) {
+        SendReservationConfirmationEmail::dispatch($this->reservation->fresh());
+    }
 
     session()->flash('success', '予約を更新しました。');
     return $this->redirect(route('reservations.show', $this->reservation), navigate: true);
@@ -131,6 +147,17 @@ $delete = function () {
                             @endforeach
                         </flux:select>
                         <flux:error name="program_id" />
+                    </flux:field>
+
+                    <!-- 登録スタッフ選択 -->
+                    <flux:field>
+                        <flux:label>登録スタッフ <span class="text-red-500">*</span></flux:label>
+                        <flux:select wire:model="staff_id" required>
+                            @foreach ($users as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="staff_id" />
                     </flux:field>
 
                     <!-- 予約日時 -->
