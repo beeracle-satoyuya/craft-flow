@@ -56,4 +56,31 @@ Route::middleware(['auth'])->group(function () {
     // 委託販売請求書発行
     Volt::route('dashboard/consignment-sales', 'consignment-sales.index')->name('consignment-sales.index');
     Volt::route('dashboard/consignment-sales/settlement', 'consignment-sales.settlement')->name('consignment-sales.settlement');
+
+    // 全銀フォーマット変換
+    Volt::route('dashboard/bank-transfers', 'bank-transfers.index')->name('bank-transfers.index');
+
+    // 全銀フォーマットファイルダウンロード
+    Route::get('dashboard/bank-transfers/download/{file}', function (string $file) {
+        $path = 'temp/' . $file;
+        $fullPath = storage_path('app/private/' . $path);
+
+        if (! file_exists($fullPath)) {
+            abort(404);
+        }
+
+        // ファイル拡張子に応じてContent-Typeを設定
+        $extension = pathinfo($file, PATHINFO_EXTENSION);
+        $mimeType = match ($extension) {
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'txt' => 'text/plain',
+            default => 'application/octet-stream',
+        };
+
+        $downloadName = 'zenkin_format_' . now()->format('YmdHis') . '.' . $extension;
+
+        return response()->download($fullPath, $downloadName, [
+            'Content-Type' => $mimeType,
+        ])->deleteFileAfterSend();
+    })->name('bank-transfers.download');
 });
