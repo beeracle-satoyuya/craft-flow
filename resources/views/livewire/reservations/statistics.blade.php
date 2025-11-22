@@ -261,17 +261,17 @@ $exportPdf = function () {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8" wire:init="$refresh">
                 <!-- 左側: 複合グラフ (棒グラフ + 折れ線グラフ) -->
                 <div class="lg:col-span-2 bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-6">
                     <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-6">月毎の予約推移</h2>
-                    <div id="combinedChart" class="w-full" style="min-height: 400px;"></div>
+                    <div id="combinedChart" class="w-full" style="min-height: 400px;" wire:ignore></div>
                 </div>
 
                 <!-- 右側: 円グラフ (予約経路) -->
                 <div class="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-6">
                     <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-6">予約経路</h2>
-                    <div id="sourceChart" class="w-full" style="min-height: 400px;"></div>
+                    <div id="sourceChart" class="w-full" style="min-height: 400px;" wire:ignore></div>
                 </div>
             </div>
         </div>
@@ -281,27 +281,59 @@ $exportPdf = function () {
     <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.1/dist/apexcharts.min.js"></script>
     
     <script>
-        // Livewireコンポーネントが完全にレンダリングされた後に実行
+        let combinedChart = null;
+        let sourceChart = null;
+        let chartsInitialized = false;
+
+        // ページ読み込み完了後にグラフを初期化
+        window.addEventListener('load', function() {
+            setTimeout(initCharts, 500);
+        });
+
+        // Livewireのライフサイクルイベントに対応
+        document.addEventListener('livewire:navigated', function() {
+            setTimeout(initCharts, 500);
+        });
+
+        // データ更新時にグラフを再描画
         document.addEventListener('livewire:init', function() {
             Livewire.hook('morph.updated', ({ component }) => {
                 if (component.id === '{{ $this->getId() }}') {
-                    initCharts();
+                    setTimeout(initCharts, 300);
                 }
             });
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // 初回読み込み時にグラフを描画
-            setTimeout(initCharts, 100);
-        });
-
         function initCharts() {
+            console.log('initCharts called');
+            
             // 既存のグラフを削除
             const combinedChartEl = document.querySelector('#combinedChart');
             const sourceChartEl = document.querySelector('#sourceChart');
             
             if (!combinedChartEl || !sourceChartEl) {
+                console.log('Chart elements not found', { combinedChartEl, sourceChartEl });
                 return;
+            }
+            
+            console.log('Chart elements found, initializing...');
+            
+            // 既存のグラフインスタンスを破棄
+            if (combinedChart) {
+                try {
+                    combinedChart.destroy();
+                } catch(e) {
+                    console.log('Error destroying combinedChart', e);
+                }
+                combinedChart = null;
+            }
+            if (sourceChart) {
+                try {
+                    sourceChart.destroy();
+                } catch(e) {
+                    console.log('Error destroying sourceChart', e);
+                }
+                sourceChart = null;
             }
             
             combinedChartEl.innerHTML = '';
@@ -420,8 +452,12 @@ $exportPdf = function () {
                 }
             };
 
-            const combinedChart = new ApexCharts(document.querySelector("#combinedChart"), combinedOptions);
-            combinedChart.render();
+            combinedChart = new ApexCharts(document.querySelector("#combinedChart"), combinedOptions);
+            combinedChart.render().then(() => {
+                console.log('Combined chart rendered successfully');
+            }).catch(e => {
+                console.error('Error rendering combined chart', e);
+            });
 
             // 円グラフ (予約経路)
             const sourceData = @json($this->reservationsBySource);
@@ -466,8 +502,13 @@ $exportPdf = function () {
                 }
             };
 
-            const sourceChart = new ApexCharts(sourceChartEl, sourceOptions);
-            sourceChart.render();
+            sourceChart = new ApexCharts(sourceChartEl, sourceOptions);
+            sourceChart.render().then(() => {
+                console.log('Source chart rendered successfully');
+                chartsInitialized = true;
+            }).catch(e => {
+                console.error('Error rendering source chart', e);
+            });
         }
     </script>
     @endvolt
