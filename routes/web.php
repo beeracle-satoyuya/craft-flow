@@ -62,7 +62,30 @@ Route::middleware(['auth'])->group(function () {
 
     // POSデータ集計
     Volt::route('dashboard/sales', 'sales.index')->name('sales.index');
+    Volt::route('dashboard/sales/aggregate', 'sales.aggregate')->name('sales.aggregate');
     Route::post('dashboard/sales/export', [App\Http\Controllers\SalesController::class, 'aggregateAndExport'])->name('sales.export');
+    Volt::route('dashboard/sales/history', 'sales.history')->name('sales.history');
+    Volt::route('dashboard/sales/statistics', 'sales.statistics')->name('sales.statistics');
+
+    // 履歴からのダウンロード
+    Route::get('dashboard/sales/history/{aggregation}/download', function (App\Models\SalesAggregation $aggregation) {
+        if (! $aggregation->fileExists()) {
+            abort(404, 'ファイルが見つかりません');
+        }
+
+        $fullPath = $aggregation->full_path;
+
+        // ファイル拡張子に応じてContent-Typeを設定
+        $extension = pathinfo($aggregation->excel_filename, PATHINFO_EXTENSION);
+        $mimeType = match ($extension) {
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            default => 'application/octet-stream',
+        };
+
+        return response()->download($fullPath, $aggregation->excel_filename, [
+            'Content-Type' => $mimeType,
+        ]);
+    })->name('sales.download-history');
     // 全銀フォーマット変換
     Volt::route('dashboard/bank-transfers', 'bank-transfers.index')->name('bank-transfers.index'); // トップページ
     Volt::route('dashboard/bank-transfers/convert', 'bank-transfers.convert')->name('bank-transfers.convert'); // 変換ページ

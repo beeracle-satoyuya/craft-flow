@@ -158,6 +158,7 @@ $filteredData = computed(function () {
     // vendor_nameが選択されていない場合、現在のバッチのデータを表示
     // 委託販売先、クライアントID、商品コードの順でソート
     $data = $this->importedData ?? collect();
+
     return $data
         ->sortBy([
             [
@@ -254,6 +255,7 @@ $importExcel = function ($file) {
         // 列の位置が取得できなかった場合は、デフォルトの位置を使用
         $getColumnValue = function ($row, $key, $defaultIndex, $defaultValue = null) use ($columnIndexes) {
             $index = $columnIndexes[$key] ?? $defaultIndex;
+
             return $row[$index] ?? $defaultValue;
         };
 
@@ -461,6 +463,7 @@ updated([
         if ($value === '__custom__') {
             $this->isCustomVendor = true;
             $this->vendor_name = '';
+
             return;
         }
 
