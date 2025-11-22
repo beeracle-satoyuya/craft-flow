@@ -55,6 +55,9 @@ Route::middleware(['auth'])->group(function () {
 
     // 委託販売請求書発行
     Volt::route('dashboard/consignment-sales', 'consignment-sales.index')->name('consignment-sales.index');
+    Volt::route('dashboard/consignment-sales/settlement/{batch?}', 'consignment-sales.settlement')->name('consignment-sales.settlement');
+    Route::get('dashboard/consignment-sales/settlement/export', [\App\Http\Controllers\ConsignmentSettlementExportController::class, 'download'])
+        ->name('consignment-sales.settlement.export');
     Volt::route('dashboard/consignment-sales/settlement', 'consignment-sales.settlement')->name('consignment-sales.settlement');
 
     // POSデータ集計
