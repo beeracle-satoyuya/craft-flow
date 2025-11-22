@@ -152,11 +152,9 @@ class SalesExport
     }
 
     /**
-     * 集計データをExcelファイルとして出力する
-     *
-     * @return StreamedResponse Excelファイルのダウンロードレスポンス
+     * Spreadsheetオブジェクトを取得（保存用）
      */
-    public function export(): StreamedResponse
+    public function getSpreadsheet(): Spreadsheet
     {
         $spreadsheet = new Spreadsheet;
 
@@ -186,6 +184,18 @@ class SalesExport
 
         // 最初のシート（全体集計）をアクティブにする
         $spreadsheet->setActiveSheetIndex(0);
+
+        return $spreadsheet;
+    }
+
+    /**
+     * 集計データをExcelファイルとして出力する
+     *
+     * @return StreamedResponse Excelファイルのダウンロードレスポンス
+     */
+    public function export(): StreamedResponse
+    {
+        $spreadsheet = $this->getSpreadsheet();
 
         // ファイル名を生成（西暦日付を使用）
         $date = $this->data->first()['date'] ?? now()->format('Y/m/d');

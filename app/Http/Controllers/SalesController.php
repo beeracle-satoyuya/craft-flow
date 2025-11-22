@@ -5,10 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Exports\SalesExport;
+use App\Models\SalesAggregation;
+use App\Models\SalesAggregationItem;
+use App\Observers\SalesAggregationItemObserver;
 use App\Services\PdfSalesExtractorService;
 use App\Services\SalesAggregationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Smalot\PdfParser\Parser;
 
 class SalesController extends Controller
@@ -109,7 +115,104 @@ class SalesController extends Controller
             // Excelファイルとして出力
             $export = new SalesExport($aggregatedData, $registerAggregatedData);
 
-            return $export->export();
+            // Excelファイルをストレージに保存
+            $spreadsheet = $export->getSpreadsheet();
+            $date = $aggregatedData->first()['date'] ?? now()->format('Y/m/d');
+            $dateFormatted = str_replace('/', '', $date);
+            $filename = "盛岡手づくり村_日次売上集計_{$dateFormatted}.xlsx";
+
+            // ストレージに保存
+            $directory = 'private/sales';
+            Storage::disk('local')->makeDirectory($directory);
+            $filePath = $directory . '/' . $filename;
+
+            $writer = new Xlsx($spreadsheet);
+            $fullPath = Storage::disk('local')->path($filePath);
+            $writer->save($fullPath);
+
+            // 集計履歴を保存
+            $totalSalesAmount = $aggregatedData->sum('total_sales');
+            $totalQuantity = $aggregatedData->sum('total_quantity');
+
+            $salesAggregation = SalesAggregation::create([
+                'user_id' => Auth::id(),
+                'aggregated_at' => now(),
+                'excel_filename' => $filename,
+                'excel_file_path' => $filePath,
+                'original_pdf_files' => $fileNames,
+                'total_sales_amount' => $totalSalesAmount,
+                'total_quantity' => $totalQuantity,
+            ]);
+
+            // Observerを一時無効化してバッチ処理を最適化
+            SalesAggregationItemObserver::disable();
+
+            try {
+                // 影響を受ける日付を収集
+                $affectedDates = [];
+
+                // 集計詳細アイテムを保存（全体集計）
+                $itemsToInsert = [];
+                foreach ($aggregatedData as $item) {
+                    $date = $item['date'];
+                    if (! in_array($date, $affectedDates)) {
+                        $affectedDates[] = $date;
+                    }
+
+                    $itemsToInsert[] = [
+                        'sales_aggregation_id' => $salesAggregation->id,
+                        'product_code' => $item['product_code'],
+                        'product_name' => $item['product_name'],
+                        'unit_price' => $item['unit_price'],
+                        'quantity' => $item['total_quantity'],
+                        'sales_amount' => $item['total_sales'],
+                        'register_name' => null, // 全体集計なのでNULL
+                        'sale_date' => $date,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+
+                // 各レジごとの詳細も保存
+                foreach ($registerAggregatedData as $register) {
+                    foreach ($register['aggregated'] as $item) {
+                        $date = $item['date'];
+                        if (! in_array($date, $affectedDates)) {
+                            $affectedDates[] = $date;
+                        }
+
+                        $itemsToInsert[] = [
+                            'sales_aggregation_id' => $salesAggregation->id,
+                            'product_code' => $item['product_code'],
+                            'product_name' => $item['product_name'],
+                            'unit_price' => $item['unit_price'],
+                            'quantity' => $item['total_quantity'],
+                            'sales_amount' => $item['total_sales'],
+                            'register_name' => $register['name'],
+                            'sale_date' => $date,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
+                }
+
+                // 一括挿入（チャンク処理でメモリ効率化）
+                foreach (array_chunk($itemsToInsert, 500) as $chunk) {
+                    SalesAggregationItem::insert($chunk);
+                }
+
+                // バッチ処理後の一括再集計を実行
+                SalesAggregationItemObserver::batchUpdateSummaries($affectedDates);
+            } finally {
+                // Observerを再有効化
+                SalesAggregationItemObserver::enable();
+            }
+
+            // ダウンロードレスポンスを返す
+            return response()->download($fullPath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Cache-Control' => 'max-age=0',
+            ]);
         } catch (\Exception $e) {
             Log::error('売上集計エラー: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
