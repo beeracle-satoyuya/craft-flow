@@ -79,14 +79,16 @@ $vendorNames = computed(function () {
 
 // フィルタリングされた委託販売データを取得（セッションから）
 $filteredData = computed(function () {
-    // vendor_nameが選択されている場合、その委託先のデータのみを取得
-    if ($this->vendor_name && $this->vendor_name !== '__custom__') {
-        // 現在のバッチのデータで、選択した委託先のデータのみを取得
-        if ($this->currentBatchId && $this->importedData && $this->importedData->isNotEmpty()) {
-            // 選択された委託先名（vendor_name）と一致するcompany_nameを持つレコードを取得
-            $matchingRecords = $this->importedData->filter(function ($item) {
-                return $item->company_name === $this->vendor_name;
-            });
+        // vendor_nameが選択されている場合、その委託先のデータのみを取得
+        if ($this->vendor_name && $this->vendor_name !== '__custom__') {
+            // 現在のバッチのデータで、選択した委託先のデータのみを取得
+            if ($this->currentBatchId && $this->importedData && $this->importedData->isNotEmpty()) {
+                // 選択された委託先名（vendor_name）と一致するcompany_nameを持つレコードを取得
+                // 文字列を正規化して比較（trim + 大文字小文字無視）
+                $normalizedVendorName = trim($this->vendor_name);
+                $matchingRecords = $this->importedData->filter(function ($item) use ($normalizedVendorName) {
+                    return trim($item->company_name ?? '') === $normalizedVendorName;
+                });
 
             // 一致するレコードが見つかった場合、そのクライアントIDを取得
             if ($matchingRecords->isNotEmpty()) {
@@ -277,9 +279,9 @@ $importExcel = function ($file) {
             $saleDate = $getColumnValue($row, 'sale_date', 0);
             $receiptNumber = $getColumnValue($row, 'receipt_number', 1);
             $clientId = $getColumnValue($row, 'client_id', 2);
-            $companyName = $getColumnValue($row, 'company_name', 3);
-            $productCode = $getColumnValue($row, 'product_code', 4);
-            $productName = $getColumnValue($row, 'product_name', 5);
+            $companyName = trim($getColumnValue($row, 'company_name', 3)); // trimで前後の空白を除去
+            $productCode = trim($getColumnValue($row, 'product_code', 4));
+            $productName = trim($getColumnValue($row, 'product_name', 5));
             $unitPrice = $getColumnValue($row, 'unit_price', 6, 0);
             $quantity = $getColumnValue($row, 'quantity', 7, 1);
             $amount = $getColumnValue($row, 'amount', 8, 0);
@@ -305,10 +307,27 @@ $importExcel = function ($file) {
                 continue;
             }
 
-            // 数値の検証と変換
-            $unitPrice = is_numeric($unitPrice) ? (int) $unitPrice : 0;
-            $quantity = is_numeric($quantity) ? (int) $quantity : 1;
-            $amount = is_numeric($amount) ? (int) $amount : 0;
+            // 数値の検証と変換（文字列から数値への変換を強化）
+            // 空白、カンマ、円マーク等を削除してから数値化
+            $cleanNumber = function ($value) {
+                if ($value === null || $value === '') {
+                    return null;
+                }
+                // 文字列の場合、特殊文字を除去
+                if (is_string($value)) {
+                    $value = str_replace(['¥', '円', ',', ' ', '　'], '', $value);
+                }
+                return is_numeric($value) ? (float) $value : null;
+            };
+            
+            $unitPrice = $cleanNumber($unitPrice) ?? 0;
+            $quantity = $cleanNumber($quantity) ?? 1;
+            $amount = $cleanNumber($amount) ?? 0;
+            
+            // 整数に変換
+            $unitPrice = (int) $unitPrice;
+            $quantity = (int) $quantity;
+            $amount = (int) $amount;
 
             // 金額が0の場合は単価×数量で計算
             if ($amount === 0 && $unitPrice > 0 && $quantity > 0) {
@@ -472,8 +491,8 @@ updated([
     },
 ]);
 
-// 次の画面へ進む
-$next = function () {
+// 精算書発行画面へ遷移
+$goToSettlement = function () {
     // バッチIDが設定されていない場合はエラー
     if (!$this->currentBatchId) {
         return;
@@ -723,17 +742,29 @@ $next = function () {
 
         <!-- アップロードしたExcelデータ表示 -->
         @if ($this->filteredData->count() > 0)
-            <div class="mb-8 max-w-3xl mx-auto">
+            <div class="mb-8 max-w-3xl mx-auto" x-data="{ showUploadedData: false }">
                 <flux:card>
                     <div class="p-6">
                         <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-bold text-zinc-900 dark:text-white">
-                                @if ($vendor_name && $vendor_name !== '__custom__')
-                                    委託販売データ（{{ $vendor_name }}）
-                                @else
-                                    アップロードしたExcelデータ
-                                @endif
-                            </h2>
+                            <div class="flex items-center gap-3">
+                                <h2 class="text-xl font-bold text-zinc-900 dark:text-white">
+                                    @if ($vendor_name && $vendor_name !== '__custom__')
+                                        委託販売データ（{{ $vendor_name }}）
+                                    @else
+                                        アップロードしたExcelデータ
+                                    @endif
+                                </h2>
+                                <flux:button variant="ghost" size="sm" x-on:click="showUploadedData = !showUploadedData">
+                                    <span x-show="!showUploadedData">
+                                        <flux:icon.chevron-down variant="micro" class="mr-1" />
+                                        表示
+                                    </span>
+                                    <span x-show="showUploadedData">
+                                        <flux:icon.chevron-up variant="micro" class="mr-1" />
+                                        非表示
+                                    </span>
+                                </flux:button>
+                            </div>
                             @if ($vendor_name && $vendor_name !== '__custom__')
                                 <flux:button variant="ghost" size="sm" wire:click="$set('vendor_name', '')">
                                     フィルター解除
@@ -741,7 +772,7 @@ $next = function () {
                             @endif
                         </div>
 
-                        <div class="overflow-x-auto">
+                        <div x-show="showUploadedData" x-collapse class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead class="bg-zinc-100 dark:bg-zinc-700">
                                     <tr>
@@ -866,11 +897,23 @@ $next = function () {
                                     ->values()
                                     ->sortBy('product_name');
                             @endphp
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-                                    商品ごとの集計
-                                </h3>
-                                <div class="overflow-x-auto">
+                            <div class="mb-6" x-data="{ showProductSummary: false }">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">
+                                        商品ごとの集計
+                                    </h3>
+                                    <flux:button variant="ghost" size="sm" x-on:click="showProductSummary = !showProductSummary">
+                                        <span x-show="!showProductSummary">
+                                            <flux:icon.chevron-down variant="micro" class="mr-1" />
+                                            表示
+                                        </span>
+                                        <span x-show="showProductSummary">
+                                            <flux:icon.chevron-up variant="micro" class="mr-1" />
+                                            非表示
+                                        </span>
+                                    </flux:button>
+                                </div>
+                                <div x-show="showProductSummary" x-collapse class="overflow-x-auto">
                                     <flux:table>
                                         <flux:columns>
                                             <flux:column>商品名</flux:column>
@@ -914,11 +957,23 @@ $next = function () {
                             </div>
 
                             <!-- 一覧テーブル -->
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-                                    明細一覧
-                                </h3>
-                                <div class="overflow-x-auto">
+                            <div class="mb-6" x-data="{ showDetailList: false }">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">
+                                        明細一覧
+                                    </h3>
+                                    <flux:button variant="ghost" size="sm" x-on:click="showDetailList = !showDetailList">
+                                        <span x-show="!showDetailList">
+                                            <flux:icon.chevron-down variant="micro" class="mr-1" />
+                                            表示
+                                        </span>
+                                        <span x-show="showDetailList">
+                                            <flux:icon.chevron-up variant="micro" class="mr-1" />
+                                            非表示
+                                        </span>
+                                    </flux:button>
+                                </div>
+                                <div x-show="showDetailList" x-collapse class="overflow-x-auto">
                                     <flux:table>
                                         <flux:columns>
                                             <flux:column>販売日</flux:column>
@@ -964,10 +1019,10 @@ $next = function () {
                                     </flux:table>
                                 </div>
 
-                                <!-- 次の画面へ進むボタン -->
+                                <!-- 精算書発行ボタン -->
                                 <div class="mt-6 flex justify-end">
-                                    <flux:button variant="primary" size="lg" wire:click="next">
-                                        次の画面へ進む
+                                    <flux:button variant="primary" size="lg" wire:click="goToSettlement">
+                                        精算書を発行
                                         <flux:icon.arrow-right variant="micro" class="ml-2" />
                                     </flux:button>
                                 </div>
