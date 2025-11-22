@@ -1,5 +1,9 @@
 import flatpickr from 'flatpickr';
 import { Japanese } from 'flatpickr/dist/l10n/ja.js';
+import ApexCharts from 'apexcharts';
+
+// ApexChartsをグローバルに設定
+window.ApexCharts = ApexCharts;
 
 // Flatpickrのデフォルト設定
 flatpickr.setDefaults({
@@ -30,7 +34,7 @@ function initDatePickers() {
         flatpickr(input, {
             dateFormat: 'Y-m-d',
             minDate: 'today',
-            onChange: function(selectedDates, dateStr) {
+            onChange: function (selectedDates, dateStr) {
                 // Livewireの状態を更新
                 input.value = dateStr;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -54,7 +58,7 @@ function initTimePickers() {
             minuteIncrement: 15,
             minTime: '09:00',
             maxTime: '17:00',
-            onChange: function(selectedDates, timeStr) {
+            onChange: function (selectedDates, timeStr) {
                 // Livewireの状態を更新
                 input.value = timeStr;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
