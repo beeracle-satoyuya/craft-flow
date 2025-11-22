@@ -20,7 +20,7 @@ class ConsignmentSettlementExportController extends Controller
         $vendorName = $request->query('vendor_name');
 
         // batchIdまたはvendorNameのいずれかが必要
-        if (!$batchId && !$vendorName) {
+        if (! $batchId && ! $vendorName) {
             abort(404, 'バッチIDまたは委託先名が指定されていません');
         }
 
@@ -32,6 +32,20 @@ class ConsignmentSettlementExportController extends Controller
         // SettlementExportクラスを使用（batchIdとvendorNameを渡す）
         $export = new SettlementExport($batchId ?? '', $vendorName);
 
-        return Excel::download($export, $fileName);
+        // Excelファイルをダウンロード
+        $response = Excel::download($export, $fileName);
+
+        // Excel出力後にバッチデータをクリア
+        $allSessions = Session::all();
+        $deletedCount = 0;
+
+        foreach ($allSessions as $key => $value) {
+            if (str_starts_with($key, 'consignment_sales_batch_')) {
+                Session::forget($key);
+                $deletedCount++;
+            }
+        }
+
+        return $response;
     }
 }
