@@ -34,7 +34,7 @@
                 </div>
             </a>
 
-            <a href="#" class="block group">
+            <a href="{{ route('sales.index') }}" class="block group">
                 <div
                     class="h-full p-8 bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border-2 border-zinc-200 dark:border-zinc-700 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-xl transition-all duration-200">
                     <div class="flex flex-col items-center text-center">
