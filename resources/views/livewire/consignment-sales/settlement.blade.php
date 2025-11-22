@@ -1,55 +1,236 @@
 <?php
 
-use App\Models\ConsignmentSale;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Session;
 
 use function Livewire\Volt\computed;
 use function Livewire\Volt\mount;
 use function Livewire\Volt\state;
+use function Livewire\Volt\updated;
 
 // 状態管理
 state(['batchId' => null]);
+state(['selectedVendorName' => '']);
 
 // ルートパラメータからbatch_idを取得
 mount(function (?string $batch = null) {
     $this->batchId = $batch;
+
+    // 委託先名が指定されている場合は初期値として設定
+    if ($batch) {
+        $sessionKey = "consignment_sales_batch_{$batch}";
+        $batchData = Session::get($sessionKey);
+        if ($batchData && isset($batchData['vendor_name']) && $batchData['vendor_name']) {
+            $this->selectedVendorName = $batchData['vendor_name'];
+        }
+    }
 });
 
-// データベースから委託販売データを取得
+// 委託先名のリストを取得
+$vendorNames = computed(function () {
+    $vendorNames = [];
+
+    // セッションからすべてのバッチデータを取得して委託先名を抽出
+    $allSessions = Session::all();
+    foreach ($allSessions as $key => $value) {
+        if (str_starts_with($key, 'consignment_sales_batch_') && is_array($value)) {
+            // vendor_nameが設定されている場合は追加
+            if (isset($value['vendor_name']) && $value['vendor_name']) {
+                $vendorName = $value['vendor_name'];
+                if (!in_array($vendorName, $vendorNames)) {
+                    $vendorNames[] = $vendorName;
+                }
+            }
+
+            // インポートしたデータから会社名を抽出
+            if (isset($value['sales']) && is_array($value['sales'])) {
+                foreach ($value['sales'] as $sale) {
+                    $companyName = is_array($sale) ? $sale['company_name'] ?? null : $sale->company_name ?? null;
+                    if ($companyName && !in_array($companyName, $vendorNames)) {
+                        $vendorNames[] = $companyName;
+                    }
+                }
+            }
+        }
+    }
+
+    // 空の値を除外してソート
+    $vendorNames = array_filter($vendorNames, fn($name) => !empty($name));
+    sort($vendorNames);
+
+    return array_values($vendorNames);
+});
+
+// セッションから委託販売データを取得（データベースには保存しない）
 $salesData = computed(function () {
-    $query = ConsignmentSale::query();
-    
-    if ($this->batchId) {
-        $query->where('batch_id', $this->batchId);
+    $allSales = collect();
+
+    // セッションからすべてのバッチデータを取得
+    $allSessions = Session::all();
+    foreach ($allSessions as $key => $value) {
+        if (str_starts_with($key, 'consignment_sales_batch_') && is_array($value) && isset($value['sales'])) {
+            // 委託先名でフィルタリング
+            if ($this->selectedVendorName) {
+                $batchVendorName = $value['vendor_name'] ?? null;
+                // バッチのvendor_nameと一致するか、またはsales内のcompany_nameと一致するかチェック
+                $matches = false;
+                if ($batchVendorName === $this->selectedVendorName) {
+                    $matches = true;
+                } else {
+                    // sales内のcompany_nameをチェック
+                    foreach ($value['sales'] as $sale) {
+                        $companyName = is_array($sale) ? $sale['company_name'] ?? null : $sale->company_name ?? null;
+                        if ($companyName === $this->selectedVendorName) {
+                            $matches = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$matches) {
+                    continue;
+                }
+            }
+
+            // 配列をオブジェクトのコレクションに変換して追加
+            $batchSales = collect($value['sales'])->map(function ($sale) {
+                // 既にオブジェクトの場合はそのまま返す（データ損失を防ぐ）
+                if (is_object($sale)) {
+                    return $sale;
+                }
+                // 配列の場合のみオブジェクト化
+                return (object) $sale;
+            });
+            $allSales = $allSales->merge($batchSales);
+        }
     }
-    
-    return $query->orderBy('created_at', 'desc')->get();
+
+    // 委託先名が選択されている場合、company_nameでフィルタリングとソート
+    if ($this->selectedVendorName && $allSales->isNotEmpty()) {
+        // 選択された委託先名と一致するcompany_nameを持つレコードを取得
+        $filtered = $allSales->filter(function ($item) {
+            return $item->company_name === $this->selectedVendorName;
+        });
+
+        // 一致するレコードが見つかった場合、ソートを適用
+        if ($filtered->isNotEmpty()) {
+            // 委託販売先、クライアントID、商品コードの順でソート
+            return $filtered
+                ->sortBy([
+                    [
+                        function ($item) {
+                            return $item->company_name ?? ($item->vendor_name ?? 'zzz');
+                        },
+                        'asc',
+                    ],
+                    [
+                        function ($item) {
+                            return $item->client_id ?? 'zzz';
+                        },
+                        'asc',
+                    ],
+                    [
+                        function ($item) {
+                            return $item->product_code ?? 'zzz';
+                        },
+                        'asc',
+                    ],
+                ])
+                ->values();
+        }
+
+        // company_nameで一致しない場合は、vendor_nameでフィルタリング（フォールバック）
+        $filtered = $allSales->filter(function ($item) {
+            return $item->vendor_name === $this->selectedVendorName;
+        });
+
+        if ($filtered->isNotEmpty()) {
+            return $filtered
+                ->sortBy([
+                    [
+                        function ($item) {
+                            return $item->company_name ?? ($item->vendor_name ?? 'zzz');
+                        },
+                        'asc',
+                    ],
+                    [
+                        function ($item) {
+                            return $item->client_id ?? 'zzz';
+                        },
+                        'asc',
+                    ],
+                    [
+                        function ($item) {
+                            return $item->product_code ?? 'zzz';
+                        },
+                        'asc',
+                    ],
+                ])
+                ->values();
+        }
+    }
+
+    // 委託先名が選択されていない場合、委託販売先、クライアントID、商品コードの順でソート
+    return $allSales
+        ->sortBy([
+            [
+                function ($item) {
+                    return $item->company_name ?? ($item->vendor_name ?? 'zzz');
+                },
+                'asc',
+            ],
+            [
+                function ($item) {
+                    return $item->client_id ?? 'zzz';
+                },
+                'asc',
+            ],
+            [
+                function ($item) {
+                    return $item->product_code ?? 'zzz';
+                },
+                'asc',
+            ],
+        ])
+        ->values();
 });
 
-// ヘッダー情報を取得（最初のレコードから）
+// ヘッダー情報を取得（セッションから）
 $headerInfo = computed(function () {
-    $sales = $this->salesData;
-    
-    if ($sales->isEmpty()) {
-        return [
-            'vendor_name' => null,
-            'commission_rate' => null,
-            'billing_period' => null,
-        ];
+    // 選択された委託先名に基づいてヘッダー情報を取得
+    if ($this->selectedVendorName) {
+        $allSessions = Session::all();
+        foreach ($allSessions as $key => $value) {
+            if (str_starts_with($key, 'consignment_sales_batch_') && is_array($value)) {
+                $batchVendorName = $value['vendor_name'] ?? null;
+                if ($batchVendorName === $this->selectedVendorName) {
+                    return [
+                        'vendor_name' => $value['vendor_name'] ?? null,
+                        'commission_rate' => $value['commission_rate'] ?? null,
+                        'billing_period' => $value['billing_period'] ?? null,
+                    ];
+                }
+            }
+        }
     }
-    
-    $firstSale = $sales->first();
-    $billingPeriod = null;
-    
-    // 備考から請求期間を抽出
-    if ($firstSale->notes && preg_match('/請求期間:\s*(.+?)(?:\s*\/|$)/', $firstSale->notes, $matches)) {
-        $billingPeriod = trim($matches[1]);
+
+    // batchIdが指定されている場合はそのバッチの情報を取得
+    if ($this->batchId) {
+        $sessionKey = "consignment_sales_batch_{$this->batchId}";
+        $batchData = Session::get($sessionKey);
+
+        if ($batchData) {
+            return [
+                'vendor_name' => $batchData['vendor_name'] ?? null,
+                'commission_rate' => $batchData['commission_rate'] ?? null,
+                'billing_period' => $batchData['billing_period'] ?? null,
+            ];
+        }
     }
-    
+
     return [
-        'vendor_name' => $firstSale->vendor_name,
-        'commission_rate' => $firstSale->commission_rate,
-        'billing_period' => $billingPeriod,
+        'vendor_name' => $this->selectedVendorName ?: null,
+        'commission_rate' => null,
+        'billing_period' => null,
     ];
 });
 
@@ -104,62 +285,22 @@ $arrayToCsv = function (array $data): string {
     return rtrim($csv, "\n");
 };
 
-// CSV出力処理
-$export = function () use ($arrayToCsv) {
-    $sales = $this->salesData;
-    $headerInfo = $this->headerInfo;
-    
-    if ($sales->isEmpty()) {
-        return;
+// Excel出力URLを取得
+$exportUrl = computed(function () {
+    $params = [];
+
+    // batchIdが指定されている場合はそれを使用
+    if ($this->batchId) {
+        $params['batch_id'] = $this->batchId;
     }
-    
-    $vendorName = $headerInfo['vendor_name'] ?? '委託先';
-    // ファイル名に使用できない文字を除去
-    $safeVendorName = preg_replace('/[\/\\\?%*:|"<>]/', '_', $vendorName);
-    $date = now()->format('Ymd');
-    $fileName = "精算書_{$safeVendorName}_{$date}.csv";
-    
-    // CSVデータを生成
-    $csvData = [];
-    
-    // BOMを追加（Excelで文字化けしないように）
-    $csvData[] = "\xEF\xBB\xBF";
-    
-    // ヘッダー情報行
-    $csvData[] = $arrayToCsv(['委託先名', $headerInfo['vendor_name'] ?? '']);
-    $csvData[] = $arrayToCsv(['請求期間', $headerInfo['billing_period'] ?? '']);
-    $csvData[] = $arrayToCsv(['手数料率', ($headerInfo['commission_rate'] ?? 0) . '%']);
-    $csvData[] = ''; // 空行
-    
-    // 集計行
-    $csvData[] = $arrayToCsv(['売上合計', number_format($this->totalAmount)]);
-    $csvData[] = $arrayToCsv(['手数料合計', number_format($this->totalCommission)]);
-    $csvData[] = $arrayToCsv(['差引支払額（振込額）', number_format($this->totalNetAmount)]);
-    $csvData[] = ''; // 空行
-    
-    // 明細ヘッダー
-    $csvData[] = $arrayToCsv(['商品名', '数量', '単価', '金額', '手数料', '差引支払額']);
-    
-    // 明細データ
-    foreach ($sales as $sale) {
-        $csvData[] = $arrayToCsv([
-            $sale->product_name,
-            $sale->quantity,
-            number_format($sale->unit_price),
-            number_format($sale->amount),
-            number_format($sale->commission),
-            number_format($sale->net_amount),
-        ]);
+
+    // 選択された委託先名がある場合はパラメータに追加
+    if ($this->selectedVendorName) {
+        $params['vendor_name'] = $this->selectedVendorName;
     }
-    
-    $csvContent = implode("\n", $csvData);
-    
-    // JavaScriptでダウンロードを実行
-    $this->dispatch('download-csv', [
-        'content' => base64_encode($csvContent),
-        'filename' => $fileName,
-    ]);
-};
+
+    return route('consignment-sales.settlement.export', $params);
+});
 
 ?>
 
@@ -190,6 +331,26 @@ $export = function () use ($arrayToCsv) {
             </p>
         </div>
 
+        <!-- 委託先名フィルタ -->
+        <div class="mb-8 max-w-3xl mx-auto">
+            <flux:card>
+                <div class="p-6">
+                    <flux:field>
+                        <flux:label>委託先名で絞り込み</flux:label>
+                        <flux:select wire:model.live="selectedVendorName" placeholder="すべての委託先を表示">
+                            <option value="">すべての委託先を表示</option>
+                            @foreach ($this->vendorNames as $vendorName)
+                                <option value="{{ $vendorName }}">{{ $vendorName }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:description>
+                            委託先名を選択すると、該当する委託先のデータのみが表示されます
+                        </flux:description>
+                    </flux:field>
+                </div>
+            </flux:card>
+        </div>
+
         <!-- 集計表示 -->
         <div class="mb-8 max-w-3xl mx-auto">
             <flux:card>
@@ -211,7 +372,8 @@ $export = function () use ($arrayToCsv) {
                                 ¥{{ number_format($this->totalCommission) }}
                             </div>
                         </div>
-                        <div class="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4 border-2 border-primary-200 dark:border-primary-800">
+                        <div
+                            class="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4 border-2 border-primary-200 dark:border-primary-800">
                             <div class="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
                                 差引支払額（振込額）
                             </div>
@@ -290,12 +452,13 @@ $export = function () use ($arrayToCsv) {
         <!-- アクションボタン -->
         <div class="max-w-3xl mx-auto">
             <div class="flex justify-between gap-4">
-                <flux:button variant="primary" wire:click="export" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="export">
+                <flux:button variant="primary" x-data="{ isLoading: false, exportUrl: '{{ $this->exportUrl }}' }"
+                    @click="isLoading = true; window.open(exportUrl, '_blank'); setTimeout(() => isLoading = false, 2000)">
+                    <span x-show="!isLoading">
                         <flux:icon.arrow-down-tray variant="micro" class="mr-2" />
-                        CSV出力
+                        Excel出力
                     </span>
-                    <span wire:loading wire:target="export">
+                    <span x-show="isLoading" x-cloak>
                         出力中...
                     </span>
                 </flux:button>
@@ -306,24 +469,5 @@ $export = function () use ($arrayToCsv) {
             </div>
         </div>
     </div>
-    
-    <script>
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('download-csv', (data) => {
-                const content = atob(data[0].content);
-                const filename = data[0].filename;
-                
-                const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
-        });
-    </script>
+
 </div>
