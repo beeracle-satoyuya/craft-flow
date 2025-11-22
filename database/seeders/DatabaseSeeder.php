@@ -32,16 +32,33 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
         ]);
 
+        User::factory()->create([
+            'name' => '佐藤 次郎',
+            'email' => 'sato@somemonoya-takahashi.jp',
+            'password' => Hash::make('password'),
+        ]);
+
         // 体験プログラムカテゴリと体験プログラムをシード
         $this->call([
             WorkshopCategorySeeder::class,
             WorkshopSeeder::class,
         ]);
 
+        $this->command->info('体験プログラムデータの投入が完了しました。');
+
+        // 予約データをシード
+        $this->call([
+            ReservationSeeder::class,
+        ]);
+
         $this->command->info('初期データの投入が完了しました！');
         $this->command->info('ログイン情報:');
         $this->command->info('  Email: staff@somemonoya-takahashi.jp');
         $this->command->info('  Password: password');
+        $this->command->info('');
+        $this->command->info('テストデータ:');
+        $this->command->info('  体験プログラム: 6種類');
+        $this->command->info('  予約データ: 100件（過去1年間）');
     }
 }
 
