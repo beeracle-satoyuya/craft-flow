@@ -3,9 +3,30 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-zinc-50 dark:bg-zinc-900">
+    <body class="min-h-screen bg-zinc-50 dark:bg-zinc-900 relative">
+        <!-- 背景画像 -->
+        @php
+            // ページごとに背景画像を切り替え
+            $backgroundImage = 'images/background.jpg'; // デフォルト（その他のページ用）
+            
+            // 予約管理関連ページ
+            if (request()->is('dashboard/reservations*')) {
+                $backgroundImage = 'images/reservations-bg.jpg';
+            }
+            // 体験プログラム関連ページ
+            elseif (request()->is('dashboard/workshops*') || request()->is('dashboard/workshop-categories*')) {
+                $backgroundImage = 'images/background-exterior.jpg';
+            }
+        @endphp
+        <div class="fixed inset-0 z-0" style="background-image: url('{{ asset($backgroundImage) }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-color: #1a365d; background-attachment: fixed;">
+            <!-- 暗いオーバーレイ -->
+            <div class="absolute inset-0 bg-gradient-to-br from-indigo-900/80 via-zinc-900/80 to-slate-900/80"></div>
+        </div>
+        
+        <!-- コンテンツラッパー -->
+        <div class="relative z-10">
         <!-- ヘッダーナビゲーション -->
-        <header class="sticky top-0 z-50 bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+        <header class="sticky top-0 z-50 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-700">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
                     <!-- ロゴ -->
@@ -21,8 +42,8 @@
                     <!-- デスクトップメニュー（グローバルメガナビゲーション） -->
                     <nav class="hidden md:flex items-center gap-1">
                         <!-- ダッシュボード -->
-                        <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
-                            <button class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('dashboard') ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700' }}">
+                        <div class="relative" x-data="{ open: false }" @click.away="open = false" @close-other-menus.window="if ($event.detail.exceptId !== 'dashboard') open = false" data-menu-id="dashboard">
+                            <button @click="open = !open; $dispatch('close-other-menus', { exceptId: 'dashboard' })" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('dashboard') ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700' }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                                 </svg>
@@ -36,6 +57,7 @@
                                  class="absolute left-0 mt-2 w-80 rounded-lg bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 p-4">
                                 <div class="grid gap-2">
                                     <a href="{{ route('dashboard') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
@@ -48,13 +70,61 @@
                                             <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">4つの機能へのハブ</div>
                                         </div>
                                     </a>
+                                    
+                                    <!-- 全銀フォーマット変換 -->
+                                    <a href="{{ url('/dashboard/bank-transfers') }}" 
+                                       @click="open = false"
+                                       class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                                       wire:navigate>
+                                        <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-zinc-900 dark:text-white">全銀フォーマット変換</div>
+                                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">全銀フォーマットに変換</div>
+                                        </div>
+                                    </a>
+                                    
+                                    <!-- POSレジデータ集計 -->
+                                    <a href="{{ url('/dashboard/sales') }}" 
+                                       @click="open = false"
+                                       class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                                       wire:navigate>
+                                        <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-zinc-900 dark:text-white">POSレジデータ集計</div>
+                                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">売上データを集計・分析</div>
+                                        </div>
+                                    </a>
+                                    
+                                    <!-- 委託販売精算書 -->
+                                    <a href="{{ url('/dashboard/consignment-sales') }}" 
+                                       @click="open = false"
+                                       class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                                       wire:navigate>
+                                        <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V13.5Zm0 2.25h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V18Zm2.498-6.75h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V13.5Zm0 2.25h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V18Zm2.504-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5Zm0 2.25h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V18Zm2.498-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5ZM8.25 6h7.5v2.25h-7.5V6ZM12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 0 0 2.25 2.25h10.5a2.25 2.25 0 0 0 2.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0 0 12 2.25Z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-zinc-900 dark:text-white">委託販売精算書</div>
+                                            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">委託販売の精算書を作成</div>
+                                        </div>
+                                    </a>
                                 </div>
                             </div>
                         </div>
 
                         <!-- 予約管理メガメニュー -->
-                        <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
-                            <button class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('reservations.*') ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700' }}">
+                        <div class="relative" x-data="{ open: false }" @click.away="open = false" @close-other-menus.window="if ($event.detail.exceptId !== 'reservations') open = false" data-menu-id="reservations">
+                            <button @click="open = !open; $dispatch('close-other-menus', { exceptId: 'reservations' })" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('reservations.*') ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700' }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
                                 </svg>
@@ -68,6 +138,7 @@
                                  class="absolute left-0 mt-2 w-96 rounded-lg bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 p-4">
                                 <div class="grid gap-2">
                                     <a href="{{ route('reservations.index') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
@@ -81,6 +152,7 @@
                                         </div>
                                     </a>
                                     <a href="{{ route('reservations.list') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
@@ -94,6 +166,7 @@
                                         </div>
                                     </a>
                                     <a href="{{ route('reservations.create') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
@@ -107,6 +180,7 @@
                                         </div>
                                     </a>
                                     <a href="{{ route('reservations.calendar') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
@@ -120,6 +194,7 @@
                                         </div>
                                     </a>
                                     <a href="{{ route('reservations.statistics') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
@@ -137,8 +212,8 @@
                         </div>
 
                         <!-- 体験プログラムメガメニュー -->
-                        <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
-                            <button class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('workshops.*') ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700' }}">
+                        <div class="relative" x-data="{ open: false }" @click.away="open = false" @close-other-menus.window="if ($event.detail.exceptId !== 'programs') open = false" data-menu-id="programs">
+                            <button @click="open = !open; $dispatch('close-other-menus', { exceptId: 'programs' })" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('workshops.*') ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700' }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
                                 </svg>
@@ -152,6 +227,7 @@
                                  class="absolute left-0 mt-2 w-96 rounded-lg bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 p-4">
                                 <div class="grid gap-2">
                                     <a href="{{ route('workshops.index') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
@@ -165,6 +241,7 @@
                                         </div>
                                     </a>
                                     <a href="{{ route('workshops.create') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
@@ -178,6 +255,7 @@
                                         </div>
                                     </a>
                                     <a href="{{ route('workshop-categories.index') }}" 
+                                       @click="open = false"
                                        class="flex items-start gap-3 p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                                        wire:navigate>
                                         <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
@@ -294,5 +372,7 @@
         {{ $slot }}
 
         @fluxScripts
+        </div>
+        <!-- /コンテンツラッパー -->
     </body>
 </html>
