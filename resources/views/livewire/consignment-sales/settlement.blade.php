@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Session;
 use function Livewire\Volt\computed;
 use function Livewire\Volt\mount;
 use function Livewire\Volt\state;
-use function Livewire\Volt\updated;
 
 // 状態管理
 state(['batchId' => null]);
@@ -69,40 +68,24 @@ $salesData = computed(function () {
     $allSessions = Session::all();
     foreach ($allSessions as $key => $value) {
         if (str_starts_with($key, 'consignment_sales_batch_') && is_array($value) && isset($value['sales'])) {
-            // 委託先名でフィルタリング
-            if ($this->selectedVendorName) {
-                $batchVendorName = $value['vendor_name'] ?? null;
-                // バッチのvendor_nameと一致するか、またはsales内のcompany_nameと一致するかチェック
-                $matches = false;
-                if ($batchVendorName === $this->selectedVendorName) {
-                    $matches = true;
-                } else {
-                    // sales内のcompany_nameをチェック
-                    foreach ($value['sales'] as $sale) {
-                        $companyName = is_array($sale) ? $sale['company_name'] ?? null : $sale->company_name ?? null;
-                        if ($companyName === $this->selectedVendorName) {
-                            $matches = true;
-                            break;
-                        }
-                    }
-                }
-                if (!$matches) {
-                    continue;
-                }
-            }
-
             // 配列をオブジェクトのコレクションに変換して追加
             $batchSales = collect($value['sales'])->map(function ($sale) {
                 // 既にオブジェクトの場合はそのまま返す（データ損失を防ぐ）
                 if (is_object($sale)) {
                     return $sale;
                 }
+
                 // 配列の場合のみオブジェクト化
                 return (object) $sale;
             });
             $allSales = $allSales->merge($batchSales);
         }
     }
+
+    // 重複を排除（batch_id + product_code + client_id + sale_date + receipt_number で一意性を保証）
+    $allSales = $allSales->unique(function ($item) {
+        return ($item->batch_id ?? '') . '_' . ($item->product_code ?? '') . '_' . ($item->client_id ?? '') . '_' . ($item->sale_date ?? '') . '_' . ($item->receipt_number ?? '');
+    });
 
     // 委託先名が選択されている場合、company_nameでフィルタリングとソート
     if ($this->selectedVendorName && $allSales->isNotEmpty()) {
@@ -275,6 +258,25 @@ $back = function () {
     return $this->redirect(route('consignment-sales.index'), navigate: true);
 };
 
+// 全バッチデータを削除する関数
+$clearAllBatches = function () {
+    $allSessions = Session::all();
+    $deletedCount = 0;
+
+    foreach ($allSessions as $key => $value) {
+        if (str_starts_with($key, 'consignment_sales_batch_')) {
+            Session::forget($key);
+            $deletedCount++;
+        }
+    }
+
+    // 成功メッセージを設定
+    session()->flash('message', "{$deletedCount}件のバッチデータを削除しました");
+
+    // インデックスページにリダイレクト
+    return $this->redirect(route('consignment-sales.index'), navigate: true);
+};
+
 // CSV配列をCSV文字列に変換するヘルパー関数
 $arrayToCsv = function (array $data): string {
     $output = fopen('php://temp', 'r+');
@@ -282,6 +284,7 @@ $arrayToCsv = function (array $data): string {
     rewind($output);
     $csv = stream_get_contents($output);
     fclose($output);
+
     return rtrim($csv, "\n");
 };
 
@@ -462,10 +465,17 @@ $exportUrl = computed(function () {
                         出力中...
                     </span>
                 </flux:button>
-                <flux:button variant="ghost" wire:click="back">
-                    <flux:icon.arrow-left variant="micro" class="mr-2" />
-                    委託販売請求書発行画面に戻る
-                </flux:button>
+                <div class="flex gap-2">
+                    <flux:button variant="danger" wire:click="clearAllBatches"
+                        onclick="return confirm('すべてのバッチデータを削除しますか？この操作は取り消せません。')">
+                        <flux:icon.trash variant="micro" class="mr-2" />
+                        全データ削除
+                    </flux:button>
+                    <flux:button variant="ghost" wire:click="back">
+                        <flux:icon.arrow-left variant="micro" class="mr-2" />
+                        委託販売請求書発行画面に戻る
+                    </flux:button>
+                </div>
             </div>
         </div>
     </div>
