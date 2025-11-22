@@ -35,8 +35,8 @@ $vendorNames = computed(function () {
         if (str_starts_with($key, 'consignment_sales_batch_') && is_array($value)) {
             // vendor_nameが設定されている場合は追加
             if (isset($value['vendor_name']) && $value['vendor_name']) {
-                $vendorName = $value['vendor_name'];
-                if (!in_array($vendorName, $vendorNames)) {
+                $vendorName = trim($value['vendor_name']);
+                if ($vendorName && !in_array($vendorName, $vendorNames)) {
                     $vendorNames[] = $vendorName;
                 }
             }
@@ -45,6 +45,7 @@ $vendorNames = computed(function () {
             if (isset($value['sales']) && is_array($value['sales'])) {
                 foreach ($value['sales'] as $sale) {
                     $companyName = is_array($sale) ? $sale['company_name'] ?? null : $sale->company_name ?? null;
+                    $companyName = $companyName ? trim($companyName) : null;
                     if ($companyName && !in_array($companyName, $vendorNames)) {
                         $vendorNames[] = $companyName;
                     }
@@ -68,6 +69,9 @@ $salesData = computed(function () {
     $allSessions = Session::all();
     foreach ($allSessions as $key => $value) {
         if (str_starts_with($key, 'consignment_sales_batch_') && is_array($value) && isset($value['sales'])) {
+            // バッチレベルのフィルタリングは行わず、全データを取得
+            // （後でアイテムレベルでフィルタリングする）
+            
             // 配列をオブジェクトのコレクションに変換して追加
             $batchSales = collect($value['sales'])->map(function ($sale) {
                 // 既にオブジェクトの場合はそのまま返す（データ損失を防ぐ）
@@ -82,6 +86,7 @@ $salesData = computed(function () {
         }
     }
 
+    // 委託先名が選択されている場合、company_nameまたはvendor_nameでフィルタリング
     // 重複を排除（batch_id + product_code + client_id + sale_date + receipt_number で一意性を保証）
     $allSales = $allSales->unique(function ($item) {
         return ($item->batch_id ?? '') . '_' . ($item->product_code ?? '') . '_' . ($item->client_id ?? '') . '_' . ($item->sale_date ?? '') . '_' . ($item->receipt_number ?? '');
@@ -89,44 +94,19 @@ $salesData = computed(function () {
 
     // 委託先名が選択されている場合、company_nameでフィルタリングとソート
     if ($this->selectedVendorName && $allSales->isNotEmpty()) {
-        // 選択された委託先名と一致するcompany_nameを持つレコードを取得
-        $filtered = $allSales->filter(function ($item) {
-            return $item->company_name === $this->selectedVendorName;
+        // 選択された委託先名と一致するレコードを取得
+        // 文字列を正規化して比較
+        $normalizedVendorName = trim($this->selectedVendorName);
+        $filtered = $allSales->filter(function ($item) use ($normalizedVendorName) {
+            $companyName = trim($item->company_name ?? '');
+            $vendorName = trim($item->vendor_name ?? '');
+            // company_name または vendor_name のいずれかが一致すればOK
+            return $companyName === $normalizedVendorName || $vendorName === $normalizedVendorName;
         });
 
         // 一致するレコードが見つかった場合、ソートを適用
         if ($filtered->isNotEmpty()) {
             // 委託販売先、クライアントID、商品コードの順でソート
-            return $filtered
-                ->sortBy([
-                    [
-                        function ($item) {
-                            return $item->company_name ?? ($item->vendor_name ?? 'zzz');
-                        },
-                        'asc',
-                    ],
-                    [
-                        function ($item) {
-                            return $item->client_id ?? 'zzz';
-                        },
-                        'asc',
-                    ],
-                    [
-                        function ($item) {
-                            return $item->product_code ?? 'zzz';
-                        },
-                        'asc',
-                    ],
-                ])
-                ->values();
-        }
-
-        // company_nameで一致しない場合は、vendor_nameでフィルタリング（フォールバック）
-        $filtered = $allSales->filter(function ($item) {
-            return $item->vendor_name === $this->selectedVendorName;
-        });
-
-        if ($filtered->isNotEmpty()) {
             return $filtered
                 ->sortBy([
                     [
@@ -307,7 +287,7 @@ $exportUrl = computed(function () {
 
 ?>
 
-<div>
+<div wire:init="$refresh">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <!-- ページタイトル -->
         <div class="text-center mb-8">
@@ -398,6 +378,23 @@ $exportUrl = computed(function () {
                     </h2>
 
                     @if ($this->salesData->count() > 0)
+                        <!-- デバッグ情報 -->
+                        <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded text-sm">
+                            <strong>デバッグ情報:</strong><br>
+                            件数: {{ $this->salesData->count() }}<br>
+                            @php
+                                $firstSale = $this->salesData->first();
+                            @endphp
+                            @if($firstSale)
+                                データ型: {{ gettype($firstSale) }}<br>
+                                @if(is_object($firstSale))
+                                    プロパティ: {{ implode(', ', array_keys(get_object_vars($firstSale))) }}
+                                @elseif(is_array($firstSale))
+                                    キー: {{ implode(', ', array_keys($firstSale)) }}
+                                @endif
+                            @endif
+                        </div>
+
                         <div class="overflow-x-auto">
                             <flux:table>
                                 <flux:columns>
@@ -413,22 +410,22 @@ $exportUrl = computed(function () {
                                     @foreach ($this->salesData as $sale)
                                         <flux:row>
                                             <flux:cell>
-                                                {{ $sale->product_name }}
+                                                {{ is_object($sale) ? ($sale->product_name ?? 'N/A') : ($sale['product_name'] ?? 'N/A') }}
                                             </flux:cell>
                                             <flux:cell class="text-right">
-                                                {{ number_format($sale->quantity) }}
+                                                {{ is_object($sale) ? number_format($sale->quantity ?? 0) : number_format($sale['quantity'] ?? 0) }}
                                             </flux:cell>
                                             <flux:cell class="text-right">
-                                                ¥{{ number_format($sale->unit_price) }}
+                                                ¥{{ is_object($sale) ? number_format($sale->unit_price ?? 0) : number_format($sale['unit_price'] ?? 0) }}
                                             </flux:cell>
                                             <flux:cell class="text-right">
-                                                ¥{{ number_format($sale->amount) }}
+                                                ¥{{ is_object($sale) ? number_format($sale->amount ?? 0) : number_format($sale['amount'] ?? 0) }}
                                             </flux:cell>
                                             <flux:cell class="text-right">
-                                                ¥{{ number_format($sale->commission) }}
+                                                ¥{{ is_object($sale) ? number_format($sale->commission ?? 0) : number_format($sale['commission'] ?? 0) }}
                                             </flux:cell>
                                             <flux:cell class="text-right">
-                                                ¥{{ number_format($sale->net_amount) }}
+                                                ¥{{ is_object($sale) ? number_format($sale->net_amount ?? 0) : number_format($sale['net_amount'] ?? 0) }}
                                             </flux:cell>
                                         </flux:row>
                                     @endforeach
