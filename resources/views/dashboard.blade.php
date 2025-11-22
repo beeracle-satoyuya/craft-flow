@@ -13,7 +13,7 @@
         <!-- 4つの機能カード (2x2グリッド) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-5xl mx-auto">
             <!-- 1. 全銀フォーマット変換 -->
-            <a href="#" class="block group">
+            <a href="{{ route('bank-transfers.index') }}" wire:navigate class="block group">
                 <div
                     class="h-full p-8 bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-xl transition-all duration-200">
                     <div class="flex flex-col items-center text-center">
@@ -30,7 +30,6 @@
                         <p class="text-zinc-600 dark:text-zinc-400">
                             銀行振込データを<br>全銀フォーマットに変換
                         </p>
-                        {{-- <span class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">準備中</span> --}}
                     </div>
                 </div>
             </a>
