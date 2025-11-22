@@ -164,13 +164,13 @@ $delete = function () {
                     <div class="grid grid-cols-2 gap-4">
                         <flux:field>
                             <flux:label>予約日 <span class="text-red-500">*</span></flux:label>
-                            <flux:input type="date" wire:model="reservation_date" required />
+                            <flux:input type="text" wire:model="reservation_date" data-date-picker required placeholder="日付を選択してください" />
                             <flux:error name="reservation_date" />
                         </flux:field>
 
                         <flux:field>
                             <flux:label>予約時刻 <span class="text-red-500">*</span></flux:label>
-                            <flux:input type="time" wire:model="reservation_time" required />
+                            <flux:input type="text" wire:model="reservation_time" data-time-picker required placeholder="時刻を選択してください" />
                             <flux:error name="reservation_time" />
                         </flux:field>
                     </div>
